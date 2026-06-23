@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://learntrack-backend.onrender.com/api/v1'
+  apiUrl: 'https://learntrack-backend.onrender.com'
 };
