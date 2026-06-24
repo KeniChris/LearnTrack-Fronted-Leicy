@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { AdminService, PendingUser } from '../../../core/services/admin.service';
+import { User } from '../../../shared/models/user.model';
 
 @Component({
     selector: 'app-admin-panel',
@@ -29,32 +30,42 @@ export class AdminPanelComponent implements OnInit {
     toast = signal<{ msg: string, show: boolean }>({ msg: '', show: false });
 
     ngOnInit() {
-        // Si ya hay un token y el usuario es ADMIN, entramos directo
         const user = this.auth.getUser();
-        if (this.auth.isLoggedIn() && user?.role === 'ADMIN') {
+
+        if (this.auth.isLoggedIn() && this.isAdmin(user)) {
             this.isLoggedIn.set(true);
             this.loadPending();
         }
     }
 
+    private isAdmin(user: User | null): boolean {
+        return user?.role === 'ADMIN' || user?.roleName === 'ADMIN';
+    }
+
     doLogin() {
         this.loginError.set('');
+
         if (!this.email.trim() || !this.password) {
             this.loginError.set('Completa todos los campos.');
             return;
         }
 
         this.loadingLogin.set(true);
+
         this.auth.login(this.email.trim(), this.password).subscribe({
-            next: () => {
-                const user = this.auth.getUser();
-                if (user?.role === 'ADMIN') {
+            next: (res) => {
+                const user = res.user || this.auth.getUser();
+
+                console.log('[ADMIN PANEL] Usuario recibido:', user);
+
+                if (this.isAdmin(user)) {
                     this.isLoggedIn.set(true);
                     this.loadPending();
                 } else {
                     this.loginError.set('Solo los administradores pueden acceder a este panel.');
-                    this.auth.logout(); // Cerramos sesión si no es admin
+                    this.auth.logout();
                 }
+
                 this.loadingLogin.set(false);
             },
             error: () => {
@@ -66,11 +77,12 @@ export class AdminPanelComponent implements OnInit {
 
     loadPending() {
         this.loadingData.set(true);
-            this.adminSvc.getPendingUsers().subscribe({
-                next: (data: PendingUser[]) => {
-                    this.pendingUsers.set(data || []);
-                    this.loadingData.set(false);
-                },
+
+        this.adminSvc.getPendingUsers().subscribe({
+            next: (data: PendingUser[]) => {
+                this.pendingUsers.set(data || []);
+                this.loadingData.set(false);
+            },
             error: () => {
                 this.showToast('Error al cargar las solicitudes');
                 this.loadingData.set(false);
@@ -80,6 +92,7 @@ export class AdminPanelComponent implements OnInit {
 
     approve(id: number) {
         if (!confirm('¿Aprobar esta cuenta? Se enviará el token JWT al correo.')) return;
+
         this.adminSvc.approveUser(id).subscribe({
             next: () => {
                 this.pendingUsers.update(users => users.filter(u => u.id !== id));
@@ -91,6 +104,7 @@ export class AdminPanelComponent implements OnInit {
 
     reject(id: number) {
         if (!confirm('¿Rechazar esta solicitud?')) return;
+
         this.adminSvc.rejectUser(id).subscribe({
             next: () => {
                 this.pendingUsers.update(users => users.filter(u => u.id !== id));
