@@ -17,17 +17,17 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<{ token: string; user: User }> {
-    return this.http.post<string>(`${this.apiUrl}/login`, { email, password }).pipe(
-      switchMap(token => {
-        this.tokenSvc.saveToken(token);
-        // Obtenemos el usuario autenticado desde /users/me
-        return this.http.get<User>(`${environment.apiUrl}/users/me`).pipe(
-          tap(user => this.tokenSvc.saveUser(user)),
-          map(user => ({ token, user }))
-        );
-      })
-    );
-  }
+  return this.http.post<{ token: string }>(`${this.apiUrl}/login`, { email, password }).pipe(
+    switchMap(response => {
+      this.tokenSvc.saveToken(response.token);
+
+      return this.http.get<User>(`${environment.apiUrl}/users/me`).pipe(
+        tap(user => this.tokenSvc.saveUser(user)),
+        map(user => ({ token: response.token, user }))
+      );
+    })
+  );
+}
 
   logout(): void {
     this.tokenSvc.clear();
