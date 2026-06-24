@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -34,24 +35,36 @@ export class LoginComponent {
 
     const { email, password } = this.loginForm.getRawValue();
 
-    this.auth.login(email, password).subscribe({
+    this.auth.login(email, password).pipe(
+      finalize(() => {
+        console.log('[LOGIN COMPONENT] Finalizó intento de login');
+        this.loading.set(false);
+      })
+    ).subscribe({
       next: (res) => {
-        // Redirigir según el estado y rol
+        console.log('[LOGIN COMPONENT] Login OK:', res.user);
+
+        const role = res.user.role || res.user.roleName;
+
         if (res.user.status === 'PENDING') {
           this.errorMsg.set('Tu cuenta está pendiente de aprobación por un administrador.');
-          this.auth.logout(); // Destruye el token para seguridad
-        } else if (res.user.role === 'DOCENTE') {
+          this.auth.logout();
+        } else if (role === 'DOCENTE') {
           this.router.navigate(['/docentes/dashboard']);
-        } else if (res.user.role === 'ADMIN') {
+        } else if (role === 'ADMIN') {
           this.router.navigate(['/admin']);
         } else {
           this.router.navigate(['/alumnos/dashboard']);
         }
-        this.loading.set(false);
       },
       error: (e) => {
-        this.errorMsg.set(e?.error?.message || 'Correo o contraseña incorrectos.');
-        this.loading.set(false);
+        console.error('[LOGIN COMPONENT] Login ERROR:', e);
+
+        if (e.name === 'TimeoutError') {
+          this.errorMsg.set('El servidor demoró demasiado en responder. Puede estar dormido o fallando.');
+        } else {
+          this.errorMsg.set(e?.error?.message || 'Correo o contraseña incorrectos.');
+        }
       }
     });
   }
