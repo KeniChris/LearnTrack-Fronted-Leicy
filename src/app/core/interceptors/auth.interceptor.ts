@@ -5,24 +5,26 @@ import { TokenService } from '../services/token.service';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const tokenSvc = inject(TokenService);
 
-  const isPublicAuthRequest =
+  const isPublicRequest =
     req.url.includes('/auth/login') ||
     req.url.includes('/auth/register') ||
     req.url.includes('/admin/verify-code');
 
-  if (isPublicAuthRequest) {
+  if (isPublicRequest) {
     return next(req);
   }
 
   const token = tokenSvc.getToken();
 
-  if (token && token !== '[object Object]') {
-    req = req.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+  if (!token || token === '[object Object]' || token.trim() === '') {
+    return next(req);
   }
+
+  req = req.clone({
+    setHeaders: {
+      Authorization: `Bearer ${token}`
+    }
+  });
 
   return next(req);
 };
